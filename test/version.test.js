@@ -7,6 +7,21 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const test = require('node:test');
 const { scripts } = require('../package.json');
+const { releaseVersion } = require('../scripts/ci-version');
+
+test('CI adds the workflow run number to the base patch version', () => {
+  assert.equal(releaseVersion('1.0.0', '1'), '1.0.1');
+  assert.equal(releaseVersion('1.2.3', '12'), '1.2.15');
+  assert.equal(releaseVersion('1.2.3', '13'), '1.2.16');
+  assert.equal(releaseVersion('1.2.3', '12'), '1.2.15');
+});
+
+test('CI rejects invalid release version inputs', () => {
+  assert.throws(() => releaseVersion('1.2.3-beta.1', '1'), /stable package version/);
+  assert.throws(() => releaseVersion('1.2.3', undefined), /positive GitHub Actions run number/);
+  assert.throws(() => releaseVersion('1.2.3', '0'), /positive GitHub Actions run number/);
+  assert.throws(() => releaseVersion('1.2.3', '9007199254740992'), /integer range/);
+});
 
 test('release commands update the manifest and lockfile', t => {
   const directory = mkdtempSync(join(tmpdir(), 'port-evict-version-'));

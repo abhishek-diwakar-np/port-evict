@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Free a local TCP or UDP port by stopping the process that owns it.",
   "keywords": ["kill-port", "free-port", "port", "tcp", "udp", "cli"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abhishek-diwakar-np/port-evict.git"
+  },
   "bin": {
     "port-evict": "./cli.js"
   },

@@ -1,4 +1,4 @@
-name: Publish to npm
+name: Stage release on npm
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
       - run: npm test
       - run: npm run test:integration
 
-  publish:
+  stage:
     needs: test
     runs-on: ubuntu-latest
     permissions:
@@ -34,6 +34,10 @@ jobs:
           node-version: '24'
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
+      - name: Set release version
+        run: |
+          version=$(node scripts/ci-version.js)
+          npm version "$version" --no-git-tag-version
       - name: Check whether this version exists
         id: registry
         run: |
@@ -47,8 +51,13 @@ jobs:
             if (!response.ok && response.status !== 404) {
               throw new Error(`npm registry returned HTTP ${response.status}`);
             }
-            if (response.ok) console.log(`${name}@${version} is already published.`);
-            appendFileSync(process.env.GITHUB_OUTPUT, `publish=${response.status === 404}\n`);
+            const shouldStage = response.status === 404;
+            const message = shouldStage
+              ? `${name}@${version} is not published. The workflow will attempt to stage it for approval.`
+              : `${name}@${version} is already published. Staging was skipped.`;
+            console.log(message);
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
+            appendFileSync(process.env.GITHUB_OUTPUT, `stage=${shouldStage}\n`);
           }
 
           checkVersion().catch(error => {
@@ -56,6 +65,8 @@ jobs:
             process.exitCode = 1;
           });
           NODE
-      - name: Publish
-        if: steps.registry.outputs.publish == 'true'
-        run: npm publish --access public
+      - name: Stage package
+        if: steps.registry.outputs.stage == 'true'
+        run: |
+          npm stage publish --access public
+          echo 'Package staged. Review and approve it in Staged Packages on npmjs.com.' >> "$GITHUB_STEP_SUMMARY"
