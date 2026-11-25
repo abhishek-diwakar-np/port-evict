@@ -1,0 +1,61 @@
+name: Publish to npm
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - run: npm test
+      - run: npm run test:integration
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Check whether this version exists
+        id: registry
+        run: |
+          node <<'NODE'
+          const { appendFileSync } = require('node:fs');
+          const { name, version } = require('./package.json');
+          const url = `https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(version)}`;
+
+          async function checkVersion() {
+            const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+            if (!response.ok && response.status !== 404) {
+              throw new Error(`npm registry returned HTTP ${response.status}`);
+            }
+            if (response.ok) console.log(`${name}@${version} is already published.`);
+            appendFileSync(process.env.GITHUB_OUTPUT, `publish=${response.status === 404}\n`);
+          }
+
+          checkVersion().catch(error => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
+      - name: Publish
+        if: steps.registry.outputs.publish == 'true'
+        run: npm publish --access public

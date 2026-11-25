@@ -1,0 +1,13 @@
+node_modules/
+.npm/
+.npm-verification-cache/
+npm-debug.log*
+coverage/
+/*.tgz
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
